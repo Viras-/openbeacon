@@ -180,10 +180,14 @@ vnRFtaskRx (void *parameter)
                                         case RFBPROTO_BEACONTRACKER:
                                             break;
                                     }
+                                    
+                                    debug_printf("TAG: %i / %i\n", g_Beacon.pkt.oid, g_Beacon.pkt.p.tracker.strength);
 
                                     // show debug info
+#if DEBUG_ENABLE == 1
                                     debug_printf("Proto used: %d\n", g_Beacon.pkt.proto);
                                     debug_printf("TX Power in packet: %d\n", g_Beacon.pkt.p.tracker.strength);
+#endif
                                 }
 			}
 			while ((nRFAPI_GetFifoStatus (DEFAULT_DEV) & FIFO_RX_EMPTY) == 0);
