@@ -40,9 +40,9 @@ const unsigned char broadcast_mac[NRF_MAX_MAC_SIZE] = { 1, 2, 3, 2, 1 };
 TBeaconEnvelope g_Beacon;
 
 /**********************************************************************/
-#define SHUFFLE(a,b)    tmp=g_Beacon.datab[a];\
-                        g_Beacon.datab[a]=g_Beacon.datab[b];\
-                        g_Beacon.datab[b]=tmp;
+#define SHUFFLE(a,b)    tmp=g_Beacon.byte[a];\
+                        g_Beacon.byte[a]=g_Beacon.byte[b];\
+                        g_Beacon.byte[b]=tmp;
 
 /**********************************************************************/
 void
@@ -65,7 +65,7 @@ PtInitNRF (void)
 {
 	if (!nRFAPI_Init
 		(DEFAULT_DEV, DEFAULT_CHANNEL, broadcast_mac, sizeof (broadcast_mac),
-		 ENABLED_NRF_FEATURES))
+		 0))
 		return 0;
 
 	nRFAPI_SetPipeSizeRX (DEFAULT_DEV, 0, 16);
@@ -156,7 +156,7 @@ vnRFtaskRx (void *parameter)
 			do
 			{
 				// read packet from nRF chip
-				nRFCMD_RegReadBuf (DEFAULT_DEV, RD_RX_PLOAD, g_Beacon.datab,
+				nRFCMD_RegReadBuf (DEFAULT_DEV, RD_RX_PLOAD, g_Beacon.byte,
 								   sizeof (g_Beacon));
 
 				// adjust byte order and decode
@@ -164,9 +164,25 @@ vnRFtaskRx (void *parameter)
 				xxtea_decode ();
 				shuffle_tx_byteorder ();
 
+                                // check which protocol is used for this package
+                                switch( g_Beacon.pkt.proto ) {
+                                    // proxreport uses strength 3
+                                    case RFBPROTO_PROXREPORT:
+                                    case RFBPROTO_PROXREPORT_EXT:
+                                        g_Beacon.pkt.p.tracker.strength = 3;
+                                        break;
+                                    // default protocol
+                                    case RFBPROTO_BEACONTRACKER:
+                                        break;
+                                }
+                                
+                                // show debug info
+                                debug_printf("Proto used: %d\n", g_Beacon.pkt.proto);
+                                debug_printf("TX Power in packet: %d\n", g_Beacon.pkt.p.tracker.strength);
+                                
 				// verify the crc checksum
 				crc =
-					crc16 (g_Beacon.datab,
+					crc16 (g_Beacon.byte,
 						   sizeof (g_Beacon) - sizeof (g_Beacon.pkt.crc));
 				if ((swapshort (g_Beacon.pkt.crc) == crc))
 					hex_dump ((u_int8_t *) & g_Beacon, 0, sizeof (g_Beacon));

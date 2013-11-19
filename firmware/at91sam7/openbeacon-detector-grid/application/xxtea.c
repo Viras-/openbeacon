@@ -34,38 +34,38 @@
 #include "xxtea.h"
 #include "proto.h"
 
-//
-// Dummy TEA encryption key of the tag - please change for real applications!
-//
+/*
+ * Default TEA encryption key of the tag - MUST CHANGE !
+ */
 const long tea_key[4] = { 0x00112233, 0x44556677, 0x8899AABB, 0xCCDDEEFF };
-
-unsigned long z, y, sum, tmp, mx;
-unsigned char e;
 
 #define TEA_ROUNDS_COUNT (6+52/4)
 #define MX ((((z>>5)^(y<<2))+((y>>3)^(z<<4)))^((sum^y)+(tea_key[(p&3)^e]^z)))
 #define DELTA 0x9E3779B9L
 
-void
+unsigned long z, y, sum, tmp, mx;
+unsigned char e;
+
+void RAMFUNC
 mx_update (unsigned char p)
 {
 	mx = MX;
 }
 
 #ifdef  CONFIG_TEA_ENABLEENCODE
-static inline void
+static inline void RAMFUNC
 mx_encode (unsigned char p)
 {
 	mx_update (p);
 	z = tmp + mx;
 }
 
-void
+void RAMFUNC
 xxtea_encode (void)
 {
 	int q;
 
-	z = g_Beacon.data[3];
+	z = g_Beacon.block[3];
 	sum = 0;
 
 	q = TEA_ROUNDS_COUNT;
@@ -74,66 +74,66 @@ xxtea_encode (void)
 		sum += DELTA;
 		e = sum >> 2 & 3;
 
-		y = g_Beacon.data[1];
-		tmp = g_Beacon.data[0];
+		y = g_Beacon.block[1];
+		tmp = g_Beacon.block[0];
 		mx_encode (0);
-		g_Beacon.data[0] = z;
+		g_Beacon.block[0] = z;
 
-		y = g_Beacon.data[2];
-		tmp = g_Beacon.data[1];
+		y = g_Beacon.block[2];
+		tmp = g_Beacon.block[1];
 		mx_encode (1);
-		g_Beacon.data[1] = z;
+		g_Beacon.block[1] = z;
 
-		y = g_Beacon.data[3];
-		tmp = g_Beacon.data[2];
+		y = g_Beacon.block[3];
+		tmp = g_Beacon.block[2];
 		mx_encode (2);
-		g_Beacon.data[2] = z;
+		g_Beacon.block[2] = z;
 
-		y = g_Beacon.data[0];
-		tmp = g_Beacon.data[3];
+		y = g_Beacon.block[0];
+		tmp = g_Beacon.block[3];
 		mx_encode (3);
-		g_Beacon.data[3] = z;
+		g_Beacon.block[3] = z;
 	}
 }
 #endif /*CONFIG_TEA_ENABLEENCODE */
 
 #ifdef  CONFIG_TEA_ENABLEDECODE
-static inline void
+static inline void RAMFUNC
 mx_decode (unsigned char p)
 {
 	mx_update (p);
 	y = tmp - mx;
 }
 
-void
+void RAMFUNC
 xxtea_decode (void)
 {
-	y = g_Beacon.data[0];
+	y = g_Beacon.block[0];
 	sum = DELTA * TEA_ROUNDS_COUNT;
 
 	while (sum != 0)
 	{
 		e = sum >> 2 & 3;
 
-		z = g_Beacon.data[2];
-		tmp = g_Beacon.data[3];
+		z = g_Beacon.block[2];
+		tmp = g_Beacon.block[3];
 		mx_decode (3);
-		g_Beacon.data[3] = y;
+		g_Beacon.block[3] = y;
 
-		z = g_Beacon.data[1];
-		tmp = g_Beacon.data[2];
+		z = g_Beacon.block[1];
+		tmp = g_Beacon.block[2];
 		mx_decode (2);
-		g_Beacon.data[2] = y;
+		g_Beacon.block[2] = y;
 
-		z = g_Beacon.data[0];
-		tmp = g_Beacon.data[1];
+		z = g_Beacon.block[0];
+		tmp = g_Beacon.block[1];
 		mx_decode (1);
-		g_Beacon.data[1] = y;
+		g_Beacon.block[1] = y;
 
-		z = g_Beacon.data[3];
-		tmp = g_Beacon.data[0];
+		z = g_Beacon.block[3];
+		tmp = g_Beacon.block[0];
 		mx_decode (0);
-		g_Beacon.data[0] = y;
+		g_Beacon.block[0] = y;
 
 		sum -= DELTA;
 	}
