@@ -34,6 +34,7 @@
 #include "nRF24L01/nRF_HW.h"
 #include "nRF24L01/nRF_CMD.h"
 #include "nRF24L01/nRF_API.h"
+#include "detector-grid.h"
 
 const unsigned char broadcast_mac[NRF_MAX_MAC_SIZE] = { 1, 2, 3, 2, 1 };
 
@@ -141,6 +142,7 @@ vnRFtaskRx (void *parameter)
 {
 	u_int16_t crc;
 	(void) parameter;
+        TBeaconInfo beaconInfo;
 
 	if (!PtInitNRF ())
 		return;
@@ -181,7 +183,11 @@ vnRFtaskRx (void *parameter)
                                             break;
                                     }
                                     
-                                    debug_printf("TAG: %i / %i\n", swapshort(g_Beacon.pkt.oid), g_Beacon.pkt.p.tracker.strength);
+                                    beaconInfo.oid = swapshort(g_Beacon.pkt.oid);
+                                    beaconInfo.strength = g_Beacon.pkt.p.tracker.strength;
+                                    beaconInfo.seenTick = xTaskGetTickCount();
+                                            
+                                    debug_printf("TAG: %d / %d / %d\n", beaconInfo.oid, beaconInfo.strength, beaconInfo.seenTick);
 
                                     // show debug info
                                     debug_printf("Proto used: %d\n", g_Beacon.pkt.proto);
