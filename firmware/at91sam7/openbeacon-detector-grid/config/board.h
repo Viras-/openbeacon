@@ -106,9 +106,4 @@ typedef struct
 
 #define AT91C_DBGU_BAUD 115200
 
-/*
- * Enable / Disable debug
- */
-#define ENABLE_DEBUG 1
-
 #endif /*__BOARD_H__*/
