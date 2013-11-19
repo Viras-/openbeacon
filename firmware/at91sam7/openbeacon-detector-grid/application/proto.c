@@ -164,30 +164,27 @@ vnRFtaskRx (void *parameter)
 				xxtea_decode ();
 				shuffle_tx_byteorder ();
 
-                                // check which protocol is used for this package
-                                switch( g_Beacon.pkt.proto ) {
-                                    // proxreport uses strength 3
-                                    case RFBPROTO_PROXREPORT:
-                                    case RFBPROTO_PROXREPORT_EXT:
-                                        g_Beacon.pkt.p.tracker.strength = 3;
-                                        break;
-                                    // default protocol
-                                    case RFBPROTO_BEACONTRACKER:
-                                        break;
-                                }
-                                
-                                // show debug info
-                                debug_printf("Proto used: %d\n", g_Beacon.pkt.proto);
-                                debug_printf("TX Power in packet: %d\n", g_Beacon.pkt.p.tracker.strength);
-                                
 				// verify the crc checksum
 				crc =
 					crc16 (g_Beacon.byte,
 						   sizeof (g_Beacon) - sizeof (g_Beacon.pkt.crc));
-				if ((swapshort (g_Beacon.pkt.crc) == crc))
-					hex_dump ((u_int8_t *) & g_Beacon, 0, sizeof (g_Beacon));
-				else
-					debug_printf ("RX: CRC error or wrong encryption key\n");
+				if ((swapshort (g_Beacon.pkt.crc) == crc)) {
+                                    // check which protocol is used for this package
+                                    switch( g_Beacon.pkt.proto ) {
+                                        // proxreport uses strength 3
+                                        case RFBPROTO_PROXREPORT:
+                                        case RFBPROTO_PROXREPORT_EXT:
+                                            g_Beacon.pkt.p.tracker.strength = 3;
+                                            break;
+                                        // default protocol
+                                        case RFBPROTO_BEACONTRACKER:
+                                            break;
+                                    }
+
+                                    // show debug info
+                                    debug_printf("Proto used: %d\n", g_Beacon.pkt.proto);
+                                    debug_printf("TX Power in packet: %d\n", g_Beacon.pkt.p.tracker.strength);
+                                }
 			}
 			while ((nRFAPI_GetFifoStatus (DEFAULT_DEV) & FIFO_RX_EMPTY) == 0);
 
