@@ -36,9 +36,57 @@
 #include "nRF24L01/nRF_API.h"
 #include "detector-grid.h"
 
+// maximum number of tags the system can handle at the same time
+#define BEACON_STACK_SIZE 8
+// number of RTOS ticks before a tag is removed from the stack
+#define BEACON_CUTOFF_TICKS 8096
+
 const unsigned char broadcast_mac[NRF_MAX_MAC_SIZE] = { 1, 2, 3, 2, 1 };
 
 TBeaconEnvelope g_Beacon;
+
+// global beacon stack for storing the last seen beacons
+TBeaconInfo g_BeaconStack[BEACON_STACK_SIZE];
+
+/**
+ * Add a beacon to the internal stack, taking into account cutoff times & minimum power ratings
+ * @param beacon Beacon to add
+ * @return Reference to entry in global beacon stack, or NULL if stack is full
+ */
+TBeaconInfo *AddBeaconToStack(TBeaconInfo *beacon) {
+    int i = 0;
+    portTickType currTickCount = xTaskGetTickCount();
+    
+    // search the whole beacon stack for old entry
+    for( i = 0; i < BEACON_STACK_SIZE; i++ ) {
+        // check for a beacon match
+        if( g_BeaconStack[i].oid == beacon->oid ) {
+            // now check if strength is more accurate or the entry is more recent then the tick cutoff
+            if( g_BeaconStack[i].strength >= beacon->strength || g_BeaconStack[i].seenTick < (currTickCount - BEACON_CUTOFF_TICKS) ) {
+                g_BeaconStack[i].seenTick = beacon->seenTick;
+                g_BeaconStack[i].strength = beacon->strength;
+                
+            }
+            
+            return &g_BeaconStack[i];
+        }
+    }
+    
+    // if no old entry is found, add a new one
+    for( i = 0; i < BEACON_STACK_SIZE; i++ ) {
+        // check for outdated entry
+        if( g_BeaconStack[i].seenTick < (currTickCount - BEACON_CUTOFF_TICKS) ) {
+            g_BeaconStack[i].oid = beacon->oid;
+            g_BeaconStack[i].seenTick = beacon->seenTick;
+            g_BeaconStack[i].strength = beacon->strength;
+            
+            return &g_BeaconStack[i];
+        }
+    }
+    
+    // if we reach here, the stack is fully used
+    return NULL;
+}
 
 /**********************************************************************/
 #define SHUFFLE(a,b)    tmp=g_Beacon.byte[a];\
@@ -183,15 +231,23 @@ vnRFtaskRx (void *parameter)
                                             break;
                                     }
                                     
-                                    beaconInfo.oid = swapshort(g_Beacon.pkt.oid);
-                                    beaconInfo.strength = g_Beacon.pkt.p.tracker.strength;
-                                    beaconInfo.seenTick = xTaskGetTickCount();
-                                            
-                                    debug_printf("TAG: %d / %d / %d\n", beaconInfo.oid, beaconInfo.strength, beaconInfo.seenTick);
-
                                     // show debug info
                                     debug_printf("Proto used: %d\n", g_Beacon.pkt.proto);
                                     debug_printf("TX Power in packet: %d\n", g_Beacon.pkt.p.tracker.strength);
+                                    
+                                    // setup beacon info
+                                    beaconInfo.oid = swapshort(g_Beacon.pkt.oid);
+                                    beaconInfo.strength = g_Beacon.pkt.p.tracker.strength;
+                                    beaconInfo.seenTick = xTaskGetTickCount();
+                                    
+                                    // add beaconinfo to global stack
+                                    TBeaconInfo *currBeaconInfo = AddBeaconToStack(&beaconInfo);
+                                    if( currBeaconInfo == NULL ) {
+                                        debug_printf("ERROR: Stack is full!\n");
+                                    }
+                                    else {
+                                        debug_printf("TAG: %04i,%i,%i\n", currBeaconInfo->oid, currBeaconInfo->strength, currBeaconInfo->seenTick);
+                                    }
                                 }
 			}
 			while ((nRFAPI_GetFifoStatus (DEFAULT_DEV) & FIFO_RX_EMPTY) == 0);
